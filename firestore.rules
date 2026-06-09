@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /usernames/{username} {
+      allow create: if request.auth != null
+                    && !exists(/databases/$(database)/documents/usernames/$(username));
+      allow read: if true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // RAWG GAME CACHE - Allow public writes for caching
+    match /gameCache/{docId} {
+      allow read: if true;
+      allow create: if
+        // Remove auth requirement, keep data validation
+        request.resource.data.keys().hasOnly(['gameData', 'timestamp'])
+        && request.resource.data.timestamp is string
+        && request.resource.data.gameData is list
+        && request.resource.data.gameData.size() <= 64
+        && (request.resource.data.gameData.size() == 0 || request.resource.data.gameData[0] is map);
+      allow update, delete: if false;
+    }
+
+    // YOUTUBE VIDEO CACHE - Allow public writes for caching
+    match /youtubeCache/{cacheId} {
+      allow read: if true;
+      allow create: if
+        // Remove auth requirement, keep data validation
+        request.resource.data.keys().hasOnly(['videoIds', 'timestamp'])
+        && request.resource.data.timestamp is string
+        && request.resource.data.videoIds is list
+        && request.resource.data.videoIds.size() <= 10
+        && (request.resource.data.videoIds.size() == 0 || request.resource.data.videoIds[0] is string);
+      allow update, delete: if false;
+    }
+  }
+}
